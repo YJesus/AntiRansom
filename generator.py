@@ -13,6 +13,7 @@ from shutil import copyfile
 import subprocess
 import re
 import locale
+import win32com.client
 
 # XLS Files
 
@@ -139,10 +140,54 @@ taskrandom = str((randint(1,100))) +  ''.join([random.choice(string.ascii_letter
 
 taskpath = re.sub(r"\\", r"\\\\", finalpathsys) 
 
-taskcommand = 'schtasks /create /tn ' + taskrandom + " /tr " + "\"" + namemonit +" " + taskpath[:-2] + "\"" + ' /sc onlogon /RL HIGHEST'
+# Task Stuff borrowed from https://dzone.com/articles/create-and-run-scheduled-task
+action_id = taskrandom 
+action_path = namemonit 
+action_arguments =  taskpath[:-2]
+action_workdir = finalpathexes 
+task_id = taskrandom
+task_hidden = False 
+run_flags = "TASK_RUN_NO_FLAGS" 
+TASK_TRIGGER_DAILY = 2
+TASK_CREATE = 2
+TASK_CREATE_OR_UPDATE = 6
+TASK_ACTION_EXEC = 0
 
-os.system(taskcommand) 
-
+RUNFLAGSENUM = {
+    "TASK_RUN_NO_FLAGS"              : 0,
+    "TASK_RUN_AS_SELF"               : 1,
+    "TASK_RUN_IGNORE_CONSTRAINTS"    : 2,
+    "TASK_RUN_USE_SESSION_ID"        : 4,
+    "TASK_RUN_USER_SID"              : 8,
+    
+}
+scheduler = win32com.client.Dispatch("Schedule.Service")
+scheduler.Connect()
+rootFolder = scheduler.GetFolder("\\")
+taskDef = scheduler.NewTask(0)
+colTriggers = taskDef.Triggers
+trigger = colTriggers.Create(9)
+trigger.Enabled = True
+colActions = taskDef.Actions
+action = colActions.Create(TASK_ACTION_EXEC)
+action.ID = action_id
+action.Path = action_path
+action.WorkingDirectory = action_workdir
+action.Arguments = action_arguments
+info = taskDef.RegistrationInfo
+settings = taskDef.Settings
+settings.Enabled = True
+settings.Hidden = task_hidden
+settings.ExecutionTimeLimit  = "PT0S"
+settings.StopIfGoingOnBatteries = False
+settings.DisallowStartIfOnBatteries = False
+principal = taskDef.Principal
+principal.RunLevel = 1
+result = rootFolder.RegisterTaskDefinition(task_id, taskDef, TASK_CREATE_OR_UPDATE, "", "", RUNFLAGSENUM[run_flags] )
+task = rootFolder.GetTask(task_id)
+task.Enabled = True
+runningTask = task.Run("")
+###
 file = open("uninstall.bat", "w")
 
 
@@ -168,7 +213,7 @@ subprocess.Popen(startcommand, shell=True)
 
 if langlocal[0] == "es_ES" :
 				
-	win32ui.MessageBox("Instalacion finalizada !!\nNo borreo la carpeta desde la que instalo Anti Ransom", "Done", 4096)			
+	win32ui.MessageBox("Instalacion finalizada !!\nNo borre la carpeta desde la que instalo Anti Ransom", "Done", 4096)			
 
 else :
 	win32ui.MessageBox("Installation finished !!\nDo NOT delete this installation folder", "Done", 4096)
